@@ -93,7 +93,7 @@ const VAULTS = [
   { key: 'dammstable', label: 'DAMMstable', address: '0xE5d6eb448Ac5A762C1ebE8cd1692b9CD08025176',
     chainId: 42161, decimals: 6, asset: 'USDT0', chain: 'Arbitrum' },
   { key: 'dammeth', label: 'DAMMeth', address: '0x3c63f3cE75dc83735745CF4e86B63414D95Ee355',
-    chainId: 1, decimals: 18, asset: 'WETH', chain: 'Ethereum' },
+    chainId: 1, decimals: 18, asset: 'WETH', chain: 'Ethereum', tvlInNative: true },
 ];
 const API = 'https://api.lagoon.finance/query';
 const WINDOW_DEFAULTS = { daily: 7, weekly: 4, monthly: 3 };
@@ -106,7 +106,7 @@ async function fetchAll() {
   const parts = VAULTS.map(v => `
     ${v.key}: vaultByAddress(address: "${v.address.toLowerCase()}", chainId: ${v.chainId}) {
       name symbol
-      state { pricePerShare totalAssetsUsd }
+      state { pricePerShare totalAssets totalAssetsUsd }
       stateHistory { pricePerShare(options: {}) { x y } }
     }`);
   const res = await fetch(API, {
@@ -128,6 +128,7 @@ async function fetchAll() {
       meta: v,
       name: raw.name,
       currentPps: Number(raw.state.pricePerShare) / scale,
+      tvlNative: Number(raw.state.totalAssets) / scale,
       tvlUsd: raw.state.totalAssetsUsd,
       points,
       daily: syntheticDaily(points),
@@ -139,6 +140,7 @@ async function fetchAll() {
 const fmtDate = t => new Date(t * 1000).toISOString().slice(0, 10);
 const fmtPct = x => (x * 100).toFixed(2) + '%';
 const fmtUsd = x => x == null ? '—' : '$' + Math.round(x).toLocaleString('en-US');
+const fmtAmt = x => x.toLocaleString('en-US', { maximumFractionDigits: x >= 1000 ? 1 : 3 });
 const fmtPps = (x, dec) => x.toFixed(Math.min(dec, 6));
 
 // ---------- render ----------
@@ -160,7 +162,9 @@ function renderCards(d) {
   const cards = [
     ['Share price', `${fmtPps(d.currentPps, d.meta.decimals)} <small>${d.meta.asset}</small>`],
     ['Since inception', `${fmtPct(sinceInception)} <small>since ${fmtDate(first.x)}</small>`],
-    ['TVL', fmtUsd(d.tvlUsd)],
+    ['Total assets', d.meta.tvlInNative
+      ? `${fmtAmt(d.tvlNative)} <small>${d.meta.asset}</small> <small>· ${fmtUsd(d.tvlUsd)}</small>`
+      : fmtUsd(d.tvlUsd)],
     ['Last settlement', fmtDate(last.x)],
   ];
   document.getElementById('cards').innerHTML = cards
