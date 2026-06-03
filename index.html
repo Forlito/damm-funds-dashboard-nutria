@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DAMM Funds</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="core.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #181c25; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #8b93a3; --accent: #5b9cf5; --accent2: #f5b85b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 24px 20px 48px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 16px; }
+  h1 span { color: var(--muted); font-weight: 400; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tabs button { background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+                 padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+  .tabs button.active { color: var(--text); border-color: var(--accent); background: #1c2334; }
+
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; }
+  .card .k { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .card .v { font-size: 18px; font-weight: 600; }
+  .card .v small { color: var(--muted); font-size: 12px; font-weight: 400; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+           padding: 16px; margin-bottom: 20px; }
+  .panel h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: var(--text); }
+  .controls { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;
+              color: var(--muted); font-size: 13px; }
+  .controls label { display: flex; gap: 6px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { background: transparent; border: none; color: var(--muted); padding: 5px 12px;
+                cursor: pointer; font-size: 13px; }
+  .seg button.active { background: #1c2334; color: var(--text); }
+  .seg button:disabled { opacity: 0.4; cursor: default; }
+  input[type=number] { width: 60px; background: var(--bg); border: 1px solid var(--border);
+                       color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 13px; }
+  .chart-box { position: relative; height: 340px; }
+  #error { display: none; background: #3a1c1c; border: 1px solid #7a3030; color: #f0b0b0;
+           padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; white-space: pre-wrap; }
+  .footnote { color: var(--muted); font-size: 12px; margin-top: -8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>DAMM Funds <span>— share price &amp; APR (Lagoon API)</span></h1>
+  <div id="error"></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="cards" id="cards"></div>
+
+  <div class="panel">
+    <h2 id="price-title">Share price</h2>
+    <div class="chart-box"><canvas id="priceChart"></canvas></div>
+    <p class="footnote">Line: synthetic daily series (linear interpolation at UTC midnights). Dots: real settlement datapoints. No extrapolation past the last settlement.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Period APR <span style="color:var(--muted);font-weight:400">(annualized simple return)</span></h2>
+    <div class="controls">
+      <label>Granularity
+        <span class="seg" id="granularity">
+          <button data-v="daily">Daily</button>
+          <button data-v="weekly" class="active">Weekly</button>
+          <button data-v="monthly">Monthly</button>
+        </span>
+      </label>
+      <label>Buckets
+        <span class="seg" id="bucketmode">
+          <button data-v="calendar" class="active">Calendar</button>
+          <button data-v="fixed">Every 7/30d</button>
+        </span>
+      </label>
+      <label>Rolling window <input type="number" id="window" min="1" step="1" value="4"> bars</label>
+    </div>
+    <div class="chart-box"><canvas id="aprChart"></canvas></div>
+    <p class="footnote">Bar = (p_end/p_start − 1) × 365/days in bucket. Partial edge buckets use their actual day count. Rolling mean is trailing (causal). Note: daily bars between settlements are interpolation plateaus — settlements are ~weekly, so daily granularity shows accrual shape, not new information.</p>
+  </div>
+</div>
+
+<script>
+'use strict';
+const { syntheticDaily, aprBars, rollingMean } = window.DammCore;
+
+const VAULTS = [
+  { key: 'dammstable', label: 'DAMMstable', address: '0xE5d6eb448Ac5A762C1ebE8cd1692b9CD08025176',
+    chainId: 42161, decimals: 6, asset: 'USDT0', chain: 'Arbitrum' },
+  { key: 'dammeth', label: 'DAMMeth', address: '0x3c63f3cE75dc83735745CF4e86B63414D95Ee355',
+    chainId: 1, decimals: 18, asset: 'WETH', chain: 'Ethereum' },
+];
+const API = 'https://api.lagoon.finance/query';
+const WINDOW_DEFAULTS = { daily: 7, weekly: 4, monthly: 3 };
+
+const state = { vault: VAULTS[0].key, granularity: 'weekly', mode: 'calendar', window: 4, data: {} };
+let priceChart = null, aprChart = null;
+
+// ---------- data ----------
+async function fetchAll() {
+  const parts = VAULTS.map(v => `
+    ${v.key}: vaultByAddress(address: "${v.address.toLowerCase()}", chainId: ${v.chainId}) {
+      name symbol
+      state { pricePerShare totalAssetsUsd }
+      stateHistory { pricePerShare(options: {}) { x y } }
+    }`);
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: `{ ${parts.join('\n')} }` }),
+  });
+  if (!res.ok) throw new Error(`Lagoon API HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.errors) throw new Error('Lagoon API: ' + JSON.stringify(json.errors));
+  for (const v of VAULTS) {
+    const raw = json.data[v.key];
+    if (!raw) throw new Error(`No data for ${v.label}`);
+    const scale = 10 ** v.decimals;
+    const points = raw.stateHistory.pricePerShare
+      .map(p => ({ x: p.x, y: Number(p.y) / scale }))
+      .sort((a, b) => a.x - b.x);
+    state.data[v.key] = {
+      meta: v,
+      name: raw.name,
+      currentPps: Number(raw.state.pricePerShare) / scale,
+      tvlUsd: raw.state.totalAssetsUsd,
+      points,
+      daily: syntheticDaily(points),
+    };
+  }
+}
+
+// ---------- formatting ----------
+const fmtDate = t => new Date(t * 1000).toISOString().slice(0, 10);
+const fmtPct = x => (x * 100).toFixed(2) + '%';
+const fmtUsd = x => x == null ? '—' : '$' + Math.round(x).toLocaleString('en-US');
+const fmtPps = (x, dec) => x.toFixed(Math.min(dec, 6));
+
+// ---------- render ----------
+function renderTabs() {
+  const el = document.getElementById('tabs');
+  el.innerHTML = '';
+  for (const v of VAULTS) {
+    const b = document.createElement('button');
+    b.textContent = v.label;
+    b.className = v.key === state.vault ? 'active' : '';
+    b.onclick = () => { state.vault = v.key; renderAll(); };
+    el.appendChild(b);
+  }
+}
+
+function renderCards(d) {
+  const first = d.points[0], last = d.points[d.points.length - 1];
+  const sinceInception = last.y / first.y - 1;
+  const cards = [
+    ['Share price', `${fmtPps(d.currentPps, d.meta.decimals)} <small>${d.meta.asset}</small>`],
+    ['Since inception', `${fmtPct(sinceInception)} <small>since ${fmtDate(first.x)}</small>`],
+    ['TVL', fmtUsd(d.tvlUsd)],
+    ['Last settlement', fmtDate(last.x)],
+  ];
+  document.getElementById('cards').innerHTML = cards
+    .map(([k, v]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`)
+    .join('');
+}
+
+function renderPriceChart(d) {
+  document.getElementById('price-title').textContent =
+    `Share price — ${d.meta.label} (${d.meta.asset}, ${d.meta.chain})`;
+  if (priceChart) priceChart.destroy();
+  priceChart = new Chart(document.getElementById('priceChart'), {
+    data: {
+      datasets: [
+        { type: 'line', label: 'Synthetic daily price',
+          data: d.daily.map(s => ({ x: s.t * 1000, y: s.p })),
+          borderColor: '#5b9cf5', borderWidth: 2, pointRadius: 0, tension: 0 },
+        { type: 'scatter', label: 'Settlements',
+          data: d.points.map(p => ({ x: p.x * 1000, y: p.y })),
+          backgroundColor: '#f5b85b', pointRadius: 4, pointHoverRadius: 6 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'nearest', intersect: false },
+      scales: {
+        x: { type: 'time', time: { unit: 'month' }, grid: { color: '#222733' }, ticks: { color: '#8b93a3' } },
+        y: { grid: { color: '#222733' }, ticks: { color: '#8b93a3' },
+             title: { display: true, text: `share price (${d.meta.asset})`, color: '#8b93a3' } },
+      },
+      plugins: {
+        legend: { labels: { color: '#8b93a3' } },
+        tooltip: { callbacks: { label: ctx =>
+          `${ctx.dataset.label}: ${fmtPps(ctx.parsed.y, d.meta.decimals)} ${d.meta.asset}` } },
+      },
+    },
+  });
+}
+
+function renderAprChart(d) {
+  const bars = aprBars(d.daily, state.granularity, state.mode);
+  const aprs = bars.map(b => b.apr * 100);
+  const roll = rollingMean(aprs, state.window);
+  if (aprChart) aprChart.destroy();
+  aprChart = new Chart(document.getElementById('aprChart'), {
+    data: {
+      labels: bars.map(b => fmtDate(b.t0)),
+      datasets: [
+        { type: 'line', label: `Rolling mean (${state.window} bars)`, data: roll,
+          borderColor: '#f5b85b', borderWidth: 2, pointRadius: 0, tension: 0, spanGaps: false },
+        { type: 'bar', label: 'APR', data: aprs, backgroundColor: '#5b9cf580', borderColor: '#5b9cf5', borderWidth: 1 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#8b93a3', maxTicksLimit: 16 } },
+        y: { grid: { color: '#222733' }, ticks: { color: '#8b93a3', callback: v => v + '%' },
+             title: { display: true, text: 'APR (annualized)', color: '#8b93a3' } },
+      },
+      plugins: {
+        legend: { labels: { color: '#8b93a3' } },
+        tooltip: { callbacks: {
+          title: items => {
+            const b = bars[items[0].dataIndex];
+            return `${fmtDate(b.t0)} → ${fmtDate(b.t1)} (${b.days}d)`;
+          },
+          label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y == null ? '—' : ctx.parsed.y.toFixed(2) + '%'}`,
+        } },
+      },
+    },
+  });
+}
+
+function renderAll() {
+  const d = state.data[state.vault];
+  if (!d) return;
+  renderTabs();
+  renderCards(d);
+  renderPriceChart(d);
+  renderAprChart(d);
+}
+
+// ---------- controls ----------
+function wireSeg(id, onPick) {
+  const seg = document.getElementById(id);
+  seg.querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      seg.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+      onPick(b.dataset.v);
+    };
+  });
+}
+wireSeg('granularity', v => {
+  state.granularity = v;
+  state.window = WINDOW_DEFAULTS[v];
+  document.getElementById('window').value = state.window;
+  // bucket mode is meaningless for daily bars
+  document.querySelectorAll('#bucketmode button').forEach(b => { b.disabled = v === 'daily'; });
+  renderAprChart(state.data[state.vault]);
+});
+wireSeg('bucketmode', v => { state.mode = v; renderAprChart(state.data[state.vault]); });
+document.getElementById('window').onchange = e => {
+  const n = Math.max(1, Math.floor(Number(e.target.value) || 1));
+  e.target.value = n;
+  state.window = n;
+  renderAprChart(state.data[state.vault]);
+};
+
+// ---------- boot ----------
+fetchAll().then(renderAll).catch(err => {
+  const el = document.getElementById('error');
+  el.style.display = 'block';
+  el.textContent = 'Failed to load data: ' + err.message;
+});
+</script>
+</body>
+</html>
