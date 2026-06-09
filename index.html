@@ -3,282 +3,631 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DAMM Funds</title>
+<title>DAMM Funds — Performance &amp; Transparency</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script src="core.js"></script>
 <style>
   :root {
-    --bg: #0f1117; --panel: #181c25; --border: #2a2f3a;
-    --text: #e6e9ef; --muted: #8b93a3; --accent: #5b9cf5; --accent2: #f5b85b;
+    --paper:#F7F6F3; --surface:#FFFFFF; --black:#000000;
+    --ink:#1A1A1A; --ink-soft:#4a4a4a; --muted:#7c8088; --faint:#aab;
+    --line:#E7E5E0; --line-soft:#F0EEE9;
+    --accent:#4d7c0f;        /* DAMM lime, darkened for text/active */
+    --accent-bright:#84cc16; /* DAMM lime, chart strokes / dots / fills */
+    --pos:#4f8a2e; --pos-bg:rgba(132,204,22,0.12);
+    --neg:#b4453a; --neg-bg:rgba(180,69,58,0.10);
+    --serif:'DM Serif Display','Georgia',serif;
+    --sans:'DM Sans',system-ui,sans-serif;
+    --mono:'DM Mono',monospace;
+    --page-w:1080px;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width: 1060px; margin: 0 auto; padding: 24px 20px 48px; }
-  h1 { font-size: 20px; font-weight: 600; margin: 0 0 16px; }
-  h1 span { color: var(--muted); font-weight: 400; }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--sans);background:var(--paper);color:var(--ink);
+       -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.55;}
+  .page{max-width:var(--page-w);margin:0 auto;background:var(--surface);min-height:100vh;
+        border-left:1px solid var(--line);border-right:1px solid var(--line);}
 
-  .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
-  .tabs button { background: var(--panel); border: 1px solid var(--border); color: var(--muted);
-                 padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; }
-  .tabs button.active { color: var(--text); border-color: var(--accent); background: #1c2334; }
+  /* ---- header ---- */
+  .header{background:var(--black);color:#fff;padding:30px 44px 26px;
+          display:flex;align-items:flex-end;justify-content:space-between;gap:32px;}
+  .logo-mark{font-family:var(--sans);font-weight:700;font-size:21px;letter-spacing:-0.04em;margin-bottom:9px;}
+  .logo-mark span{color:var(--accent-bright);}
+  .header-tagline{font-family:var(--serif);font-style:italic;font-size:26px;line-height:1.1;
+                  letter-spacing:-0.02em;max-width:420px;}
+  .header-meta{text-align:right;}
+  .header-meta-label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+                     color:#7c8088;margin-bottom:3px;}
+  .header-meta-value{font-family:var(--mono);font-size:11px;color:#cfd3da;}
+  .header-badge{display:inline-flex;align-items:center;gap:6px;margin-top:10px;
+                background:rgba(132,204,22,0.13);border:.5px solid rgba(132,204,22,0.4);color:var(--accent-bright);
+                font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+                padding:4px 10px;border-radius:2px;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-bright);
+       box-shadow:0 0 0 0 rgba(132,204,22,.6);animation:pulse 2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(132,204,22,.5);}70%{box-shadow:0 0 0 5px rgba(132,204,22,0);}100%{box-shadow:0 0 0 0 rgba(132,204,22,0);}}
 
-  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; }
-  .card .k { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
-  .card .v { font-size: 18px; font-weight: 600; }
-  .card .v small { color: var(--muted); font-size: 12px; font-weight: 400; }
+  /* ---- fund tabs ---- */
+  .fundbar{display:flex;align-items:flex-end;gap:0;padding:0 44px;border-bottom:1px solid var(--line);}
+  .fundtab{background:none;border:none;cursor:pointer;font-family:var(--sans);font-weight:600;
+           font-size:15px;color:var(--muted);padding:16px 0;margin-right:28px;
+           border-bottom:2px solid transparent;letter-spacing:-0.01em;}
+  .fundtab.active{color:var(--ink);border-bottom-color:var(--accent-bright);}
+  .fundtab small{font-family:var(--mono);font-weight:400;font-size:10px;color:var(--faint);
+                 text-transform:uppercase;letter-spacing:.05em;margin-left:6px;}
 
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-           padding: 16px; margin-bottom: 20px; }
-  .panel h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: var(--text); }
-  .controls { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;
-              color: var(--muted); font-size: 13px; }
-  .controls label { display: flex; gap: 6px; align-items: center; }
-  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-  .seg button { background: transparent; border: none; color: var(--muted); padding: 5px 12px;
-                cursor: pointer; font-size: 13px; }
-  .seg button.active { background: #1c2334; color: var(--text); }
-  .seg button:disabled { opacity: 0.4; cursor: default; }
-  input[type=number] { width: 60px; background: var(--bg); border: 1px solid var(--border);
-                       color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 13px; }
-  .chart-box { position: relative; height: 340px; }
-  #error { display: none; background: #3a1c1c; border: 1px solid #7a3030; color: #f0b0b0;
-           padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; white-space: pre-wrap; }
-  .footnote { color: var(--muted); font-size: 12px; margin-top: -8px; }
+  /* ---- error ---- */
+  #error{display:none;background:#fbeeec;border:1px solid #e3b6af;color:#9c382e;
+         padding:12px 16px;border-radius:6px;margin:20px 44px;font-size:13px;white-space:pre-wrap;}
+  #loading{padding:40px 44px;color:var(--muted);font-family:var(--mono);font-size:12px;}
+
+  /* ---- stats bar ---- */
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--line);}
+  .stat{padding:18px 20px;border-right:1px solid var(--line-soft);}
+  .stat:last-child{border-right:none;}
+  .stat .label{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
+               color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+  .stat .num{font-family:var(--serif);font-size:25px;line-height:1;letter-spacing:-0.03em;color:var(--ink);}
+  .stat .num .u{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:0;}
+  .stat .sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:5px;}
+  .num.pos{color:var(--pos);} .num.neg{color:var(--neg);}
+  .num.accent{color:var(--accent);}
+  .miniseg{display:inline-flex;border:.5px solid var(--line);border-radius:4px;overflow:hidden;margin-left:auto;}
+  .miniseg button{background:none;border:none;font-family:var(--mono);font-size:9px;color:var(--muted);
+                  padding:2px 6px;cursor:pointer;}
+  .miniseg button.active{background:var(--ink);color:#fff;}
+
+  /* ---- customize bar ---- */
+  .customize{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:14px 44px;
+             border-bottom:1px solid var(--line);background:var(--paper);}
+  .customize .lab{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+                  color:var(--muted);margin-right:6px;}
+  .chip{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;
+        border:1px solid var(--line);background:var(--surface);padding:5px 11px;border-radius:20px;
+        display:inline-flex;align-items:center;gap:6px;user-select:none;}
+  .chip.on{color:var(--ink);border-color:#cdd6bf;background:#f3f7ea;}
+  .chip .tick{width:13px;height:13px;border-radius:3px;border:1px solid var(--faint);display:inline-block;position:relative;}
+  .chip.on .tick{background:var(--accent-bright);border-color:var(--accent-bright);}
+  .chip.on .tick::after{content:'';position:absolute;left:3.5px;top:1px;width:3px;height:6px;
+                        border:solid #fff;border-width:0 1.6px 1.6px 0;transform:rotate(45deg);}
+
+  /* ---- sections ---- */
+  .body{padding:8px 44px 40px;}
+  .section{padding:28px 0;border-bottom:1px solid var(--line-soft);}
+  .section:last-child{border-bottom:none;}
+  .section-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+                 color:var(--accent);margin-bottom:7px;display:flex;align-items:center;gap:8px;}
+  .section-label::after{content:'';flex:1;height:.5px;background:var(--line);}
+  .section-title{font-family:var(--serif);font-size:20px;letter-spacing:-0.02em;line-height:1.15;margin-bottom:4px;}
+  .section-title .q{color:var(--muted);font-style:italic;}
+  .footnote{color:var(--muted);font-size:11.5px;line-height:1.5;margin-top:12px;font-family:var(--sans);}
+  .footnote code{font-family:var(--mono);font-size:11px;background:var(--paper);padding:1px 5px;border-radius:3px;color:var(--ink-soft);}
+
+  /* ---- controls ---- */
+  .controls{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:14px 0 6px;color:var(--muted);font-size:12px;}
+  .controls label{display:flex;gap:7px;align-items:center;font-family:var(--mono);font-size:10px;
+                  letter-spacing:.04em;text-transform:uppercase;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .seg button{background:var(--surface);border:none;color:var(--muted);padding:6px 12px;cursor:pointer;
+              font-family:var(--sans);font-size:12px;font-weight:500;}
+  .seg button+button{border-left:1px solid var(--line);}
+  .seg button.active{background:var(--ink);color:#fff;}
+  .seg button:disabled{opacity:.35;cursor:default;}
+  input[type=number]{width:58px;background:var(--surface);border:1px solid var(--line);color:var(--ink);
+                     border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px;}
+  .chart-box{position:relative;height:340px;margin-top:8px;}
+
+  /* ---- metric grid (risk) ---- */
+  .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:14px;
+         border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .mcell{padding:16px 18px;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);}
+  .mcell:nth-child(3n){border-right:none;}
+  .mcell .mk{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+  .mcell .mv{font-family:var(--serif);font-size:22px;letter-spacing:-0.02em;line-height:1;}
+  .mcell .ms{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:5px;}
+  .mv.pos{color:var(--pos);} .mv.neg{color:var(--neg);} .mv.na{color:var(--faint);}
+
+  /* ---- monthly returns table ---- */
+  .mtable-wrap{overflow-x:auto;margin-top:14px;}
+  table.mret{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px;}
+  table.mret th,table.mret td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line-soft);white-space:nowrap;}
+  table.mret th{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:500;
+                border-bottom:1px solid var(--line);}
+  table.mret td.yr,table.mret th.yr{text-align:left;font-weight:600;color:var(--ink);font-family:var(--sans);}
+  table.mret td.ytd,table.mret th.ytd{font-weight:600;border-left:1px solid var(--line);padding-left:12px;}
+  td.cell-pos{color:var(--pos);background:var(--pos-bg);}
+  td.cell-neg{color:var(--neg);background:var(--neg-bg);}
+  td.cell-na{color:var(--faint);}
+
+  .btn{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+       background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);padding:7px 14px;
+       border-radius:6px;cursor:pointer;}
+  .btn:hover{border-color:var(--accent-bright);color:var(--ink);}
+
+  .meth-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px 36px;margin-top:6px;}
+  .meth-grid .mrow{font-size:12.5px;color:var(--ink-soft);line-height:1.55;}
+  .meth-grid .mrow strong{color:var(--ink);font-weight:600;}
+  .meth-grid .mk{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+                 color:var(--accent);margin-bottom:3px;}
+
+  /* ---- footer ---- */
+  .footer{background:var(--black);color:#7c8088;padding:18px 44px;display:flex;justify-content:space-between;
+          font-family:var(--mono);font-size:10px;letter-spacing:.04em;line-height:1.6;}
+  .footer a{color:#cfd3da;text-decoration:none;}
+  .disclaimer{background:var(--black);color:rgba(255,255,255,.25);font-family:var(--mono);font-size:9.5px;
+              line-height:1.6;padding:0 44px 22px;border-top:.5px solid rgba(255,255,255,.06);padding-top:12px;}
+
+  @media (max-width:760px){
+    .stats{grid-template-columns:repeat(2,1fr);} .stat{border-bottom:1px solid var(--line-soft);}
+    .mgrid{grid-template-columns:repeat(2,1fr);} .mcell:nth-child(3n){border-right:1px solid var(--line-soft);}
+    .meth-grid{grid-template-columns:1fr;} .header{flex-direction:column;align-items:flex-start;}
+    .body,.fundbar,.customize,.stat,.header,.footer,.disclaimer{padding-left:20px;padding-right:20px;}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>DAMM Funds <span>— share price &amp; APR (Lagoon API)</span></h1>
-  <div id="error"></div>
-  <div class="tabs" id="tabs"></div>
-  <div class="cards" id="cards"></div>
+<div class="page">
 
-  <div class="panel">
-    <h2 id="price-title">Share price</h2>
-    <div class="chart-box"><canvas id="priceChart"></canvas></div>
-    <p class="footnote">Line: synthetic daily series (linear interpolation at UTC midnights). Dots: real settlement datapoints. No extrapolation past the last settlement.</p>
-  </div>
-
-  <div class="panel">
-    <h2>Period APR <span style="color:var(--muted);font-weight:400">(annualized simple return)</span></h2>
-    <div class="controls">
-      <label>Granularity
-        <span class="seg" id="granularity">
-          <button data-v="daily">Daily</button>
-          <button data-v="weekly" class="active">Weekly</button>
-          <button data-v="monthly">Monthly</button>
-        </span>
-      </label>
-      <label>Buckets
-        <span class="seg" id="bucketmode">
-          <button data-v="calendar" class="active">Calendar</button>
-          <button data-v="fixed">Every 7/30d</button>
-        </span>
-      </label>
-      <label>Rolling window <input type="number" id="window" min="1" step="1" value="4"> bars</label>
+  <div class="header">
+    <div>
+      <div class="logo-mark">DAMM<span>·</span>Capital</div>
+      <div class="header-tagline">Fund performance<br>&amp; transparency.</div>
     </div>
-    <div class="chart-box"><canvas id="aprChart"></canvas></div>
-    <p class="footnote">Bar = (p_end/p_start − 1) × 365/days in bucket. Partial edge buckets use their actual day count. Rolling mean is trailing (causal). Note: daily bars between settlements are interpolation plateaus — settlements are ~weekly, so daily granularity shows accrual shape, not new information.</p>
+    <div class="header-meta">
+      <div class="header-meta-label">Data source</div>
+      <div class="header-meta-value">Lagoon API · on-chain</div>
+      <div class="header-meta-label" style="margin-top:8px;">As of</div>
+      <div class="header-meta-value" id="asof">—</div>
+      <div class="header-badge"><span class="dot"></span> Live</div>
+    </div>
   </div>
+
+  <div class="fundbar" id="fundbar"></div>
+  <div id="error"></div>
+  <div id="loading">Loading live fund data from the Lagoon API…</div>
+
+  <div id="app" style="display:none">
+    <div class="stats" id="stats"></div>
+
+    <div class="customize" id="customize">
+      <span class="lab">Show</span>
+    </div>
+
+    <div class="body">
+
+      <!-- PERFORMANCE -->
+      <div class="section" data-sec="performance">
+        <div class="section-label">Performance</div>
+        <div class="section-title" id="perf-title">Share price</div>
+        <div class="controls">
+          <label>View
+            <span class="seg" id="perfview">
+              <button data-v="price" class="active">Share price</button>
+              <button data-v="growth">Growth of 100</button>
+              <button data-v="rolling">Rolling yield</button>
+            </span>
+          </label>
+          <label>Range
+            <span class="seg" id="perfrange">
+              <button data-v="30">1M</button>
+              <button data-v="90">3M</button>
+              <button data-v="180">6M</button>
+              <button data-v="365">1Y</button>
+              <button data-v="all" class="active">All</button>
+            </span>
+          </label>
+        </div>
+        <div class="chart-box"><canvas id="perfChart"></canvas></div>
+        <p class="footnote" id="perf-foot"></p>
+      </div>
+
+      <!-- PERIOD APR -->
+      <div class="section" data-sec="apr">
+        <div class="section-label">Period return</div>
+        <div class="section-title">Period APR <span class="q">— annualized simple return</span></div>
+        <div class="controls">
+          <label>Granularity
+            <span class="seg" id="granularity">
+              <button data-v="daily">Daily</button>
+              <button data-v="weekly" class="active">Weekly</button>
+              <button data-v="monthly">Monthly</button>
+            </span>
+          </label>
+          <label>Buckets
+            <span class="seg" id="bucketmode">
+              <button data-v="calendar" class="active">Calendar</button>
+              <button data-v="fixed">Every 7/30d</button>
+            </span>
+          </label>
+          <label>Rolling window <input type="number" id="window" min="1" step="1" value="4"> bars</label>
+        </div>
+        <div class="chart-box"><canvas id="aprChart"></canvas></div>
+        <p class="footnote">Bar = <code>(p_end/p_start − 1) × 365/days</code> in bucket. Partial edge buckets use their actual day count. Rolling mean is trailing (causal). Daily bars between settlements are interpolation plateaus — settlements are ~weekly, so daily granularity shows accrual shape, not new information.</p>
+      </div>
+
+      <!-- MONTHLY RETURNS -->
+      <div class="section" data-sec="monthly">
+        <div class="section-label">Monthly returns</div>
+        <div class="section-title">Calendar returns table</div>
+        <div class="mtable-wrap"><table class="mret" id="mret"></table></div>
+        <p class="footnote">Each cell is the geometric return for that calendar month, from month-end NAV per share to month-end. <strong>YTD</strong> links the year's months geometrically. The current month is month-to-date. Net of fees (NAV per share already reflects management/performance fees).</p>
+      </div>
+
+      <!-- RISK & CONSISTENCY -->
+      <div class="section" data-sec="risk">
+        <div class="section-label">Risk &amp; consistency</div>
+        <div class="section-title">Risk profile <span class="q">— on weekly settled NAV</span></div>
+        <div class="controls">
+          <label>Risk-free rate
+            <input type="number" id="rf" min="0" step="0.5" value="0" style="width:64px"> % p.a.
+          </label>
+        </div>
+        <div class="mgrid" id="risk"></div>
+        <p class="footnote">All risk statistics are computed on <strong>weekly</strong> returns (√52 annualization, calendar 365-day basis) — the honest frequency given ~weekly settlement. Volatility, Sharpe and Sortino computed on the interpolated <em>daily</em> series would be smoothing-biased (understate risk, overstate ratios), so they are deliberately not shown. Drawdowns are measured on the real settlement path. Sharpe/Sortino are excess over the risk-free rate set above.</p>
+      </div>
+
+      <!-- METHODOLOGY -->
+      <div class="section" data-sec="methodology">
+        <div class="section-label">Methodology &amp; data</div>
+        <div class="section-title">How these numbers are computed</div>
+        <div class="meth-grid">
+          <div class="mrow"><div class="mk">NAV per share</div>Read live from the Lagoon vault (<code>pricePerShare</code>). The valuation manager settles total assets roughly weekly; NAV per share is derived at each settlement. Already net of fees.</div>
+          <div class="mrow"><div class="mk">Annualized yield</div><strong>(P_end / P_start)<sup>365/d</sup> − 1</strong>, the trailing-window annualized growth of NAV per share (the Superstate / Ondo convention). Net of fees.</div>
+          <div class="mrow"><div class="mk">CAGR (since inception)</div><strong>(P_now / P_inception)<sup>1/years</sup> − 1</strong>, geometric — the constant annual rate reproducing the realized end value.</div>
+          <div class="mrow"><div class="mk">Interpolation</div>The daily line is linear interpolation of settlement points at UTC midnights, drawn for readability. No extrapolation past the last settlement. Statistics never use the interpolated daily series.</div>
+        </div>
+        <div style="margin-top:18px;"><button class="btn" id="csv">↓ Download NAV history (CSV)</button></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>DAMM Capital — institutional DeFi<br>Live data via <a href="https://lagoon.finance" target="_blank">Lagoon Finance</a></div>
+    <div style="text-align:right">Read-only transparency dashboard<br>No backend · client-side only</div>
+  </div>
+  <div class="disclaimer">
+    Performance figures are derived from on-chain NAV per share settled approximately weekly and are net of fees. Past performance does not guarantee future results. Risk statistics computed on a low-frequency settled series understate true volatility and overstate risk-adjusted ratios; treat them as indicative. This dashboard is for informational purposes only and does not constitute financial, investment, or legal advice.
+  </div>
+
 </div>
 
 <script>
 'use strict';
-const { syntheticDaily, aprBars, rollingMean } = window.DammCore;
+const C = window.DammCore;
 
 const VAULTS = [
-  { key: 'dammstable', label: 'DAMMstable', address: '0xE5d6eb448Ac5A762C1ebE8cd1692b9CD08025176',
-    chainId: 42161, decimals: 6, asset: 'USDT0', chain: 'Arbitrum' },
-  { key: 'dammeth', label: 'DAMMeth', address: '0x3c63f3cE75dc83735745CF4e86B63414D95Ee355',
-    chainId: 1, decimals: 18, asset: 'WETH', chain: 'Ethereum', tvlInNative: true },
+  { key:'dammstable', label:'DAMMstable', tag:'USDT0 · Arbitrum',
+    address:'0xE5d6eb448Ac5A762C1ebE8cd1692b9CD08025176', chainId:42161, decimals:6, asset:'USDT0', chain:'Arbitrum' },
+  { key:'dammeth', label:'DAMMeth', tag:'WETH · Ethereum',
+    address:'0x3c63f3cE75dc83735745CF4e86B63414D95Ee355', chainId:1, decimals:18, asset:'WETH', chain:'Ethereum', tvlInNative:true },
 ];
 const API = 'https://api.lagoon.finance/query';
-const WINDOW_DEFAULTS = { daily: 7, weekly: 4, monthly: 3 };
+const SECTIONS = [
+  { id:'performance', label:'Performance' },
+  { id:'apr', label:'Period APR' },
+  { id:'monthly', label:'Monthly returns' },
+  { id:'risk', label:'Risk & consistency' },
+  { id:'methodology', label:'Methodology' },
+];
+const WINDOW_DEFAULTS = { daily:7, weekly:4, monthly:3 };
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-const state = { vault: VAULTS[0].key, granularity: 'weekly', mode: 'calendar', window: 4, data: {} };
-let priceChart = null, aprChart = null;
+function loadVisible(){
+  try { const v = JSON.parse(localStorage.getItem('damm_visible')); if (v) return v; } catch(e){}
+  return Object.fromEntries(SECTIONS.map(s => [s.id, true]));
+}
+const state = {
+  vault: VAULTS[0].key,
+  perfView:'price', perfRange:'all',
+  granularity:'weekly', mode:'calendar', window:4,
+  yieldWin:30, rf:0,
+  visible: loadVisible(),
+  data:{},
+};
+let perfChart=null, aprChart=null;
 
 // ---------- data ----------
-async function fetchAll() {
+async function fetchAll(){
   const parts = VAULTS.map(v => `
-    ${v.key}: vaultByAddress(address: "${v.address.toLowerCase()}", chainId: ${v.chainId}) {
+    ${v.key}: vaultByAddress(address:"${v.address.toLowerCase()}", chainId:${v.chainId}){
       name symbol
       state { pricePerShare totalAssets totalAssetsUsd }
-      stateHistory { pricePerShare(options: {}) { x y } }
+      stateHistory { pricePerShare(options:{}) { x y } }
     }`);
-  const res = await fetch(API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: `{ ${parts.join('\n')} }` }),
-  });
+  const res = await fetch(API,{ method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ query:`{ ${parts.join('\n')} }` }) });
   if (!res.ok) throw new Error(`Lagoon API HTTP ${res.status}`);
   const json = await res.json();
   if (json.errors) throw new Error('Lagoon API: ' + JSON.stringify(json.errors));
-  for (const v of VAULTS) {
+  for (const v of VAULTS){
     const raw = json.data[v.key];
     if (!raw) throw new Error(`No data for ${v.label}`);
     const scale = 10 ** v.decimals;
     const points = raw.stateHistory.pricePerShare
-      .map(p => ({ x: p.x, y: Number(p.y) / scale }))
-      .sort((a, b) => a.x - b.x);
+      .map(p => ({ x:p.x, y:Number(p.y)/scale })).sort((a,b)=>a.x-b.x);
     state.data[v.key] = {
-      meta: v,
-      name: raw.name,
-      currentPps: Number(raw.state.pricePerShare) / scale,
-      tvlNative: Number(raw.state.totalAssets) / scale,
-      tvlUsd: raw.state.totalAssetsUsd,
-      points,
-      daily: syntheticDaily(points),
+      meta:v, name:raw.name,
+      currentPps:Number(raw.state.pricePerShare)/scale,
+      tvlNative:Number(raw.state.totalAssets)/scale,
+      tvlUsd:raw.state.totalAssetsUsd,
+      points, daily:C.syntheticDaily(points),
     };
   }
 }
 
 // ---------- formatting ----------
-const fmtDate = t => new Date(t * 1000).toISOString().slice(0, 10);
-const fmtPct = x => (x * 100).toFixed(2) + '%';
-const fmtUsd = x => x == null ? '—' : '$' + Math.round(x).toLocaleString('en-US');
-const fmtAmt = x => x.toLocaleString('en-US', { maximumFractionDigits: x >= 1000 ? 1 : 3 });
-const fmtPps = (x, dec) => x.toFixed(Math.min(dec, 6));
+const fmtDate = t => new Date(t*1000).toISOString().slice(0,10);
+const fmtMonthYr = t => { const d=new Date(t*1000); return MONTHS[d.getUTCMonth()]+' '+d.getUTCFullYear(); };
+const fmtPct = (x,dp=2) => x==null?'—':(x>=0?'+':'')+(x*100).toFixed(dp)+'%';
+const fmtPctP = (x,dp=2) => x==null?'—':(x*100).toFixed(dp)+'%';
+const fmtUsd = x => x==null?'—':'$'+Math.round(x).toLocaleString('en-US');
+const fmtAmt = x => x.toLocaleString('en-US',{maximumFractionDigits:x>=1000?1:3});
+const fmtPps = (x,dec)=>x.toFixed(Math.min(dec,6));
+const fmtNum = (x,dp=2)=>x==null?'—':x.toFixed(dp);
+const cls = x => x==null?'na':(x>=0?'pos':'neg');
 
 // ---------- render ----------
-function renderTabs() {
-  const el = document.getElementById('tabs');
-  el.innerHTML = '';
-  for (const v of VAULTS) {
+function renderFundbar(){
+  const el = document.getElementById('fundbar'); el.innerHTML='';
+  for (const v of VAULTS){
     const b = document.createElement('button');
-    b.textContent = v.label;
-    b.className = v.key === state.vault ? 'active' : '';
-    b.onclick = () => { state.vault = v.key; renderAll(); };
+    b.className = 'fundtab'+(v.key===state.vault?' active':'');
+    b.innerHTML = `${v.label}<small>${v.tag}</small>`;
+    b.onclick = ()=>{ state.vault=v.key; renderAll(); };
     el.appendChild(b);
   }
 }
 
-function renderCards(d) {
-  const first = d.points[0], last = d.points[d.points.length - 1];
-  const sinceInception = last.y / first.y - 1;
-  const cards = [
-    ['Share price', `${fmtPps(d.currentPps, d.meta.decimals)} <small>${d.meta.asset}</small>`],
-    ['Since inception', `${fmtPct(sinceInception)} <small>since ${fmtDate(first.x)}</small>`],
-    ['Total assets', d.meta.tvlInNative
-      ? `${fmtAmt(d.tvlNative)} <small>${d.meta.asset}</small> <small>· ${fmtUsd(d.tvlUsd)}</small>`
-      : fmtUsd(d.tvlUsd)],
-    ['Last settlement', fmtDate(last.x)],
-  ];
-  document.getElementById('cards').innerHTML = cards
-    .map(([k, v]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`)
-    .join('');
+function renderCustomize(){
+  const el = document.getElementById('customize');
+  el.querySelectorAll('.chip').forEach(c=>c.remove());
+  for (const s of SECTIONS){
+    const on = state.visible[s.id] !== false;
+    const c = document.createElement('span');
+    c.className = 'chip'+(on?' on':'');
+    c.innerHTML = `<span class="tick"></span>${s.label}`;
+    c.onclick = ()=>{
+      state.visible[s.id] = !(state.visible[s.id] !== false);
+      localStorage.setItem('damm_visible', JSON.stringify(state.visible));
+      renderCustomize(); applyVisibility();
+    };
+    el.appendChild(c);
+  }
+}
+function applyVisibility(){
+  for (const s of SECTIONS){
+    const node = document.querySelector(`[data-sec="${s.id}"]`);
+    if (node) node.style.display = (state.visible[s.id]!==false) ? '' : 'none';
+  }
 }
 
-function renderPriceChart(d) {
-  document.getElementById('price-title').textContent =
-    `Share price — ${d.meta.label} (${d.meta.asset}, ${d.meta.chain})`;
-  if (priceChart) priceChart.destroy();
-  priceChart = new Chart(document.getElementById('priceChart'), {
-    data: {
-      datasets: [
-        { type: 'line', label: 'Synthetic daily price',
-          data: d.daily.map(s => ({ x: s.t * 1000, y: s.p })),
-          borderColor: '#5b9cf5', borderWidth: 2, pointRadius: 0, tension: 0 },
-        { type: 'scatter', label: 'Settlements',
-          data: d.points.map(p => ({ x: p.x * 1000, y: p.y })),
-          backgroundColor: '#f5b85b', pointRadius: 4, pointHoverRadius: 6 },
-      ],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
-      interaction: { mode: 'nearest', intersect: false },
-      scales: {
-        x: { type: 'time', time: { unit: 'month' }, grid: { color: '#222733' }, ticks: { color: '#8b93a3' } },
-        y: { grid: { color: '#222733' }, ticks: { color: '#8b93a3' },
-             title: { display: true, text: `share price (${d.meta.asset})`, color: '#8b93a3' } },
+function renderStats(d){
+  const first=d.points[0], last=d.points[d.points.length-1];
+  const since = C.cumulativeReturn(d.points);
+  const cagr = C.cagr(d.points);
+  const ty = C.trailingYield(d.points, state.yieldWin);
+  const tvl = d.meta.tvlInNative
+    ? `${fmtAmt(d.tvlNative)} <span class="u">${d.meta.asset}</span>`
+    : fmtUsd(d.tvlUsd);
+  const tvlSub = d.meta.tvlInNative ? fmtUsd(d.tvlUsd) : '';
+  const yseg = [7,30,90].map(w=>`<button data-v="${w}" class="${w===state.yieldWin?'active':''}">${w}D</button>`).join('');
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="label">NAV / share</div>
+      <div class="num">${fmtPps(d.currentPps,d.meta.decimals)} <span class="u">${d.meta.asset}</span></div>
+      <div class="sub">at ${fmtDate(last.x)}</div></div>
+    <div class="stat"><div class="label">Since inception</div>
+      <div class="num ${cls(since)}">${fmtPct(since)}</div>
+      <div class="sub">from ${fmtDate(first.x)}</div></div>
+    <div class="stat"><div class="label">Annualized (CAGR)</div>
+      <div class="num accent">${fmtPctP(cagr)}</div>
+      <div class="sub">geometric, net</div></div>
+    <div class="stat"><div class="label">Trailing yield <span class="miniseg" id="yseg">${yseg}</span></div>
+      <div class="num ${cls(ty)}">${fmtPctP(ty)}</div>
+      <div class="sub">${state.yieldWin}-day, annualized · net</div></div>
+    <div class="stat"><div class="label">Total assets</div>
+      <div class="num">${tvl}</div>
+      <div class="sub">${tvlSub}</div></div>
+    <div class="stat"><div class="label">Last settlement</div>
+      <div class="num" style="font-size:19px">${fmtDate(last.x)}</div>
+      <div class="sub">${d.points.length} settlements</div></div>`;
+  document.getElementById('asof').textContent = fmtDate(last.x);
+  document.querySelectorAll('#yseg button').forEach(b=>{
+    b.onclick = ()=>{ state.yieldWin=Number(b.dataset.v); renderStats(d); };
+  });
+}
+
+function sliceDaily(daily){
+  if (state.perfRange==='all') return daily;
+  const days = Number(state.perfRange);
+  const cutoff = daily[daily.length-1].t - days*C.DAY;
+  return daily.filter(s=>s.t>=cutoff);
+}
+
+function renderPerf(d){
+  const titleEl=document.getElementById('perf-title'), footEl=document.getElementById('perf-foot');
+  if (perfChart) perfChart.destroy();
+  const dailySlice = sliceDaily(d.daily);
+  let datasets, yTitle, foot, yFmt;
+
+  if (state.perfView==='price'){
+    titleEl.textContent = `Share price — ${d.meta.label} (${d.meta.asset}, ${d.meta.chain})`;
+    yTitle = `NAV / share (${d.meta.asset})`;
+    const lo = dailySlice.length?dailySlice[0].t:d.daily[0].t;
+    const dots = d.points.filter(p=>p.x>=lo);
+    datasets = [
+      { type:'line', label:'Synthetic daily NAV', data:dailySlice.map(s=>({x:s.t*1000,y:s.p})),
+        borderColor:'#1A1A1A', borderWidth:1.5, pointRadius:0, tension:0 },
+      { type:'scatter', label:'Settlements', data:dots.map(p=>({x:p.x*1000,y:p.y})),
+        backgroundColor:'#84cc16', pointRadius:3.5, pointHoverRadius:6 },
+    ];
+    yFmt = v=>fmtPps(v,d.meta.decimals)+' '+d.meta.asset;
+    foot = 'Black line: synthetic daily NAV (linear interpolation at UTC midnights). Lime dots: real settlement datapoints. No extrapolation past the last settlement.';
+  } else if (state.perfView==='growth'){
+    titleEl.textContent = `Growth of 100 — ${d.meta.label}`;
+    yTitle = 'value of 100 at inception';
+    const g = C.growthOf100(d.daily);
+    const gSlice = state.perfRange==='all'?g:g.filter(s=>s.t>=d.daily[d.daily.length-1].t-Number(state.perfRange)*C.DAY);
+    datasets = [{ type:'line', label:'Growth of 100', data:gSlice.map(s=>({x:s.t*1000,y:s.v})),
+      borderColor:'#4d7c0f', backgroundColor:'rgba(132,204,22,0.10)', borderWidth:2, pointRadius:0, tension:0, fill:true }];
+    yFmt = v=>v.toFixed(2);
+    foot = 'Compounded value of 100 units invested at inception, tracking NAV per share. Net of fees.';
+  } else { // rolling yield
+    titleEl.textContent = `Rolling yield — ${d.meta.label}`;
+    yTitle = 'annualized yield';
+    const r30=C.rollingYieldSeries(d.daily,30), r90=C.rollingYieldSeries(d.daily,90);
+    const within = t => state.perfRange==='all' || t>=d.daily[d.daily.length-1].t-Number(state.perfRange)*C.DAY;
+    datasets = [
+      { type:'line', label:'30-day rolling APY', data:r30.filter(s=>within(s.t)).map(s=>({x:s.t*1000,y:s.apy==null?null:s.apy*100})),
+        borderColor:'#84cc16', borderWidth:2, pointRadius:0, tension:0, spanGaps:false },
+      { type:'line', label:'90-day rolling APY', data:r90.filter(s=>within(s.t)).map(s=>({x:s.t*1000,y:s.apy==null?null:s.apy*100})),
+        borderColor:'#1A1A1A', borderWidth:1.5, pointRadius:0, tension:0, spanGaps:false, borderDash:[4,3] },
+    ];
+    yFmt = v=>v.toFixed(2)+'%';
+    foot = 'Trailing annualized yield: (NAV_now / NAV_{t−window})^(365/window) − 1, sampled daily. Shows whether the yield is stable or drifting. Net of fees.';
+  }
+  footEl.textContent = foot;
+  perfChart = new Chart(document.getElementById('perfChart'),{
+    data:{datasets},
+    options:{ responsive:true, maintainAspectRatio:false, animation:false,
+      interaction:{mode:'nearest', intersect:false},
+      scales:{
+        x:{type:'time', time:{unit: state.perfRange==='all'||Number(state.perfRange)>120?'month':'week'},
+           grid:{color:'#F0EEE9'}, ticks:{color:'#7c8088'}},
+        y:{grid:{color:'#F0EEE9'}, ticks:{color:'#7c8088'}, title:{display:true,text:yTitle,color:'#7c8088'}},
       },
-      plugins: {
-        legend: { labels: { color: '#8b93a3' } },
-        tooltip: { callbacks: { label: ctx =>
-          `${ctx.dataset.label}: ${fmtPps(ctx.parsed.y, d.meta.decimals)} ${d.meta.asset}` } },
-      },
+      plugins:{ legend:{labels:{color:'#7c8088',usePointStyle:true,boxWidth:8}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y==null?'—':yFmt(ctx.parsed.y)}`}} },
     },
   });
 }
 
-function renderAprChart(d) {
-  const bars = aprBars(d.daily, state.granularity, state.mode);
-  const aprs = bars.map(b => b.apr * 100);
-  const roll = rollingMean(aprs, state.window);
+function renderApr(d){
+  const bars = C.aprBars(d.daily, state.granularity, state.mode);
+  const aprs = bars.map(b=>b.apr*100);
+  const roll = C.rollingMean(aprs, state.window);
   if (aprChart) aprChart.destroy();
-  aprChart = new Chart(document.getElementById('aprChart'), {
-    data: {
-      labels: bars.map(b => fmtDate(b.t0)),
-      datasets: [
-        { type: 'line', label: `Rolling mean (${state.window} bars)`, data: roll,
-          borderColor: '#f5b85b', borderWidth: 2, pointRadius: 0, tension: 0, spanGaps: false },
-        { type: 'bar', label: 'APR', data: aprs, backgroundColor: '#5b9cf580', borderColor: '#5b9cf5', borderWidth: 1 },
-      ],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
-      scales: {
-        x: { grid: { display: false }, ticks: { color: '#8b93a3', maxTicksLimit: 16 } },
-        y: { grid: { color: '#222733' }, ticks: { color: '#8b93a3', callback: v => v + '%' },
-             title: { display: true, text: 'APR (annualized)', color: '#8b93a3' } },
-      },
-      plugins: {
-        legend: { labels: { color: '#8b93a3' } },
-        tooltip: { callbacks: {
-          title: items => {
-            const b = bars[items[0].dataIndex];
-            return `${fmtDate(b.t0)} → ${fmtDate(b.t1)} (${b.days}d)`;
-          },
-          label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y == null ? '—' : ctx.parsed.y.toFixed(2) + '%'}`,
-        } },
-      },
+  aprChart = new Chart(document.getElementById('aprChart'),{
+    data:{ labels:bars.map(b=>fmtDate(b.t0)),
+      datasets:[
+        { type:'line', label:`Rolling mean (${state.window} bars)`, data:roll,
+          borderColor:'#1A1A1A', borderWidth:2, pointRadius:0, tension:0, spanGaps:false },
+        { type:'bar', label:'APR', data:aprs, backgroundColor:'rgba(132,204,22,0.45)', borderColor:'#84cc16', borderWidth:1 },
+      ] },
+    options:{ responsive:true, maintainAspectRatio:false, animation:false,
+      scales:{ x:{grid:{display:false}, ticks:{color:'#7c8088', maxTicksLimit:16}},
+        y:{grid:{color:'#F0EEE9'}, ticks:{color:'#7c8088', callback:v=>v+'%'}, title:{display:true,text:'APR (annualized)',color:'#7c8088'}} },
+      plugins:{ legend:{labels:{color:'#7c8088',usePointStyle:true,boxWidth:8}},
+        tooltip:{callbacks:{
+          title:items=>{ const b=bars[items[0].dataIndex]; return `${fmtDate(b.t0)} → ${fmtDate(b.t1)} (${b.days}d)`; },
+          label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y==null?'—':ctx.parsed.y.toFixed(2)+'%'}` }} },
     },
   });
 }
 
-function renderAll() {
-  const d = state.data[state.vault];
-  if (!d) return;
-  renderTabs();
-  renderCards(d);
-  renderPriceChart(d);
-  renderAprChart(d);
+function renderMonthly(d){
+  const monthly = C.monthlyReturns(d.daily, d.points[0].y);
+  const rows = C.monthlyTable(monthly);
+  let html = '<thead><tr><th class="yr">Year</th>' +
+    MONTHS.map(m=>`<th>${m}</th>`).join('') + '<th class="ytd">YTD</th></tr></thead><tbody>';
+  for (const r of rows){
+    html += `<tr><td class="yr">${r.year}</td>` + r.months.map(m=>{
+      if (m==null) return '<td class="cell-na">·</td>';
+      return `<td class="${m>=0?'cell-pos':'cell-neg'}">${(m*100).toFixed(2)}</td>`;
+    }).join('') + `<td class="ytd ${r.ytd==null?'cell-na':(r.ytd>=0?'cell-pos':'cell-neg')}">${r.ytd==null?'·':(r.ytd*100).toFixed(2)}</td></tr>`;
+  }
+  html += '</tbody>';
+  document.getElementById('mret').innerHTML = html;
+}
+
+function renderRisk(d){
+  const weekly = C.resample(d.points, 7);
+  const wr = C.simpleReturns(weekly);
+  const rf = state.rf/100;
+  const vol = C.annualizedVol(wr, 52);
+  const sh = C.sharpe(wr, rf, 52);
+  const so = C.sortino(wr, rf, 52);
+  const mdd = C.maxDrawdown(d.points);
+  const cdd = C.currentDrawdown(d.points);
+  const uw = C.longestUnderwater(d.points);
+  const monthly = C.monthlyReturns(d.daily, d.points[0].y).map(m=>m.ret);
+  const bw = C.bestWorst(monthly);
+  const posW = C.positiveRate(wr);
+  const flat = vol < 1e-4;
+  const cell = (k,v,c,s)=>`<div class="mcell"><div class="mk">${k}</div><div class="mv ${c||''}">${v}</div><div class="ms">${s||''}</div></div>`;
+  document.getElementById('risk').innerHTML =
+    cell('Annualized volatility', flat?'≈0%':fmtPctP(vol), flat?'na':'', 'weekly returns, √52') +
+    cell('Sharpe ratio', sh==null?'n/a':fmtNum(sh), sh==null?'na':(sh>=0?'pos':'neg'), flat?'capital-stable':'weekly, excess of rf') +
+    cell('Sortino ratio', so==null?'n/a':fmtNum(so), so==null?'na':(so>=0?'pos':'neg'), 'downside-only risk') +
+    cell('Max drawdown', fmtPct(mdd), mdd<0?'neg':'na', 'peak-to-trough, settled path') +
+    cell('Current drawdown', cdd<-1e-6?fmtPct(cdd):'0.00%', cdd<-1e-6?'neg':'na', cdd<-1e-6?'below high-water':'at all-time high') +
+    cell('Longest underwater', uw.days>0?Math.round(uw.days)+'d':'0d', uw.days>0?'neg':'na', uw.ongoing?'ongoing':'recovered') +
+    cell('Positive weeks', fmtPctP(posW), posW>=0.5?'pos':'neg', wr.length+' weekly obs') +
+    cell('Best month', fmtPct(bw.best), bw.best>=0?'pos':'neg', 'calendar month') +
+    cell('Worst month', fmtPct(bw.worst), bw.worst>=0?'pos':'neg', 'calendar month');
+}
+
+function downloadCsv(d){
+  const monthly = C.monthlyReturns(d.daily, d.points[0].y);
+  const mMap = new Map(monthly.map(m=>[fmtDate(m.t).slice(0,7), m.ret]));
+  let csv = 'date,nav_per_share,month_return\n';
+  for (const p of d.points){
+    const ym = fmtDate(p.x).slice(0,7);
+    csv += `${fmtDate(p.x)},${p.y},\n`;
+  }
+  csv += '\nmonth,monthly_return\n';
+  for (const m of monthly) csv += `${fmtDate(m.t).slice(0,7)},${(m.ret*100).toFixed(4)}%\n`;
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${d.meta.label}-nav-history.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function renderAll(){
+  const d = state.data[state.vault]; if (!d) return;
+  renderFundbar(); renderCustomize(); renderStats(d);
+  renderPerf(d); renderApr(d); renderMonthly(d); renderRisk(d);
+  document.getElementById('csv').onclick = ()=>downloadCsv(d);
+  applyVisibility();
 }
 
 // ---------- controls ----------
-function wireSeg(id, onPick) {
-  const seg = document.getElementById(id);
-  seg.querySelectorAll('button').forEach(b => {
-    b.onclick = () => {
-      seg.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
-      onPick(b.dataset.v);
-    };
-  });
+function wireSeg(id, onPick){
+  const seg=document.getElementById(id);
+  seg.querySelectorAll('button').forEach(b=>{ b.onclick=()=>{
+    seg.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b)); onPick(b.dataset.v);
+  }; });
 }
-wireSeg('granularity', v => {
-  state.granularity = v;
-  state.window = WINDOW_DEFAULTS[v];
-  document.getElementById('window').value = state.window;
-  // bucket mode is meaningless for daily bars
-  document.querySelectorAll('#bucketmode button').forEach(b => { b.disabled = v === 'daily'; });
-  renderAprChart(state.data[state.vault]);
+wireSeg('perfview', v=>{ state.perfView=v; renderPerf(state.data[state.vault]); });
+wireSeg('perfrange', v=>{ state.perfRange=v; renderPerf(state.data[state.vault]); });
+wireSeg('granularity', v=>{
+  state.granularity=v; state.window=WINDOW_DEFAULTS[v];
+  document.getElementById('window').value=state.window;
+  document.querySelectorAll('#bucketmode button').forEach(b=>{b.disabled=v==='daily';});
+  renderApr(state.data[state.vault]);
 });
-wireSeg('bucketmode', v => { state.mode = v; renderAprChart(state.data[state.vault]); });
-document.getElementById('window').onchange = e => {
-  const n = Math.max(1, Math.floor(Number(e.target.value) || 1));
-  e.target.value = n;
-  state.window = n;
-  renderAprChart(state.data[state.vault]);
+wireSeg('bucketmode', v=>{ state.mode=v; renderApr(state.data[state.vault]); });
+document.getElementById('window').onchange=e=>{
+  const n=Math.max(1,Math.floor(Number(e.target.value)||1)); e.target.value=n; state.window=n;
+  renderApr(state.data[state.vault]);
+};
+document.getElementById('rf').onchange=e=>{
+  state.rf=Math.max(0,Number(e.target.value)||0); e.target.value=state.rf;
+  renderRisk(state.data[state.vault]);
 };
 
 // ---------- boot ----------
-fetchAll().then(renderAll).catch(err => {
-  const el = document.getElementById('error');
-  el.style.display = 'block';
-  el.textContent = 'Failed to load data: ' + err.message;
+fetchAll().then(()=>{
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='';
+  renderAll();
+}).catch(err=>{
+  document.getElementById('loading').style.display='none';
+  const el=document.getElementById('error'); el.style.display='block';
+  el.textContent='Failed to load data: '+err.message;
 });
 </script>
 </body>
