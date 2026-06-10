@@ -369,7 +369,10 @@ async function fetchBenchmarks(){
     state.data[v.key].bench = null;
     if (!b) return;
     try {
-      const r = await fetch(LLAMA + b.pool);
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(LLAMA + b.pool, { signal: ctrl.signal });
+      clearTimeout(to);
       if (!r.ok) return;
       const j = await r.json();
       state.data[v.key].bench = (j.data || [])
@@ -657,10 +660,13 @@ document.getElementById('rf').onchange=e=>{
 };
 
 // ---------- boot ----------
-fetchAll().then(fetchBenchmarks).then(()=>{
+fetchAll().then(()=>{
+  // Render immediately on fund data; benchmark is enriched async so a slow/blocked
+  // DefiLlama call can never hold the whole page hostage.
   document.getElementById('loading').style.display='none';
   document.getElementById('app').style.display='';
   renderAll();
+  fetchBenchmarks().then(()=>{ const d=state.data[state.vault]; if(d) renderStats(d); }).catch(()=>{});
 }).catch(err=>{
   document.getElementById('loading').style.display='none';
   const el=document.getElementById('error'); el.style.display='block';
