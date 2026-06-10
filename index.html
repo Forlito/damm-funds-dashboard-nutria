@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DAMM Funds — Performance &amp; Transparency</title>
+<title>DAMM Funds</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -226,7 +226,7 @@
       <!-- PERIOD APR -->
       <div class="section" data-sec="apr">
         <div class="section-label">Period return</div>
-        <div class="section-title">Period APR <span class="q">— annualized simple return</span></div>
+        <div class="section-title">Period APR <span class="q">(annualized simple return)</span></div>
         <div class="controls">
           <label>Granularity
             <span class="seg" id="granularity">
@@ -244,7 +244,7 @@
           <label>Rolling window <input type="number" id="window" min="1" step="1" value="4"> bars</label>
         </div>
         <div class="chart-box"><canvas id="aprChart"></canvas></div>
-        <p class="footnote">Bar = <code>(p_end/p_start − 1) × 365/days</code> in bucket. Partial edge buckets use their actual day count. Rolling mean is trailing (causal). Daily bars between settlements are interpolation plateaus — settlements are ~weekly, so daily granularity shows accrual shape, not new information.</p>
+        <p class="footnote">Bar = (p_end/p_start − 1) × 365/days in bucket. Partial edge buckets use their actual day count. Rolling mean is trailing (causal). Note: daily bars between settlements are interpolation plateaus — settlements are ~weekly, so daily granularity shows accrual shape, not new information.</p>
       </div>
 
       <!-- MONTHLY RETURNS -->
@@ -415,12 +415,12 @@ function renderStats(d){
   const tvlSub = d.meta.tvlInNative ? fmtUsd(d.tvlUsd) : '';
   const yseg = [7,30,90].map(w=>`<button data-v="${w}" class="${w===state.yieldWin?'active':''}">${w}D</button>`).join('');
   document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="label">NAV / share</div>
+    <div class="stat"><div class="label">Share price</div>
       <div class="num">${fmtPps(d.currentPps,d.meta.decimals)} <span class="u">${d.meta.asset}</span></div>
       <div class="sub">at ${fmtDate(last.x)}</div></div>
     <div class="stat"><div class="label">Since inception</div>
       <div class="num ${cls(since)}">${fmtPct(since)}</div>
-      <div class="sub">from ${fmtDate(first.x)}</div></div>
+      <div class="sub">since ${fmtDate(first.x)}</div></div>
     <div class="stat"><div class="label">Annualized (CAGR)</div>
       <div class="num accent">${fmtPctP(cagr)}</div>
       <div class="sub">geometric, net</div></div>
@@ -454,17 +454,17 @@ function renderPerf(d){
 
   if (state.perfView==='price'){
     titleEl.textContent = `Share price — ${d.meta.label} (${d.meta.asset}, ${d.meta.chain})`;
-    yTitle = `NAV / share (${d.meta.asset})`;
+    yTitle = `share price (${d.meta.asset})`;
     const lo = dailySlice.length?dailySlice[0].t:d.daily[0].t;
     const dots = d.points.filter(p=>p.x>=lo);
     datasets = [
-      { type:'line', label:'Synthetic daily NAV', data:dailySlice.map(s=>({x:s.t*1000,y:s.p})),
+      { type:'line', label:'Synthetic daily price', data:dailySlice.map(s=>({x:s.t*1000,y:s.p})),
         borderColor:'#1A1A1A', borderWidth:1.5, pointRadius:0, tension:0 },
       { type:'scatter', label:'Settlements', data:dots.map(p=>({x:p.x*1000,y:p.y})),
         backgroundColor:'#84cc16', pointRadius:3.5, pointHoverRadius:6 },
     ];
     yFmt = v=>fmtPps(v,d.meta.decimals)+' '+d.meta.asset;
-    foot = 'Black line: synthetic daily NAV (linear interpolation at UTC midnights). Lime dots: real settlement datapoints. No extrapolation past the last settlement.';
+    foot = 'Line: synthetic daily series (linear interpolation at UTC midnights). Dots: real settlement datapoints. No extrapolation past the last settlement.';
   } else if (state.perfView==='growth'){
     titleEl.textContent = `Growth of 100 — ${d.meta.label}`;
     yTitle = 'value of 100 at inception';
