@@ -64,7 +64,7 @@
   #loading{padding:40px 44px;color:var(--muted);font-family:var(--mono);font-size:12px;}
 
   /* ---- stats bar ---- */
-  .stats{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--line);}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--line);}
   .stat{padding:18px 20px;border-right:1px solid var(--line-soft);}
   .stat:last-child{border-right:none;}
   .stat .label{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
@@ -300,11 +300,14 @@ const C = window.DammCore;
 
 const VAULTS = [
   { key:'dammstable', label:'DAMMstable', tag:'USDT0 · Arbitrum',
-    address:'0xE5d6eb448Ac5A762C1ebE8cd1692b9CD08025176', chainId:42161, decimals:6, asset:'USDT0', chain:'Arbitrum' },
+    address:'0xE5d6eb448Ac5A762C1ebE8cd1692b9CD08025176', chainId:42161, decimals:6, asset:'USDT0', chain:'Arbitrum',
+    benchmark:{ label:'AAVE USDC', pool:'aa70268e-4b52-42bf-a116-608b370f9501' } },
   { key:'dammeth', label:'DAMMeth', tag:'WETH · Ethereum',
-    address:'0x3c63f3cE75dc83735745CF4e86B63414D95Ee355', chainId:1, decimals:18, asset:'WETH', chain:'Ethereum', tvlInNative:true },
+    address:'0x3c63f3cE75dc83735745CF4e86B63414D95Ee355', chainId:1, decimals:18, asset:'WETH', chain:'Ethereum', tvlInNative:true,
+    benchmark:{ label:'Lido wstETH', pool:'747c1d2a-c668-4682-b9f9-296708a3dd90' } },
 ];
 const API = 'https://api.lagoon.finance/query';
+const LLAMA = 'https://yields.llama.fi/chart/';
 const SECTIONS = [
   { id:'performance', label:'Performance' },
   { id:'apr', label:'Period APR' },
@@ -358,6 +361,37 @@ async function fetchAll(){
   }
 }
 
+// Benchmark APY history from DefiLlama (per vault). Resilient: on any failure the
+// benchmark stays null and its card shows "unavailable" without breaking the page.
+async function fetchBenchmarks(){
+  await Promise.all(VAULTS.map(async v => {
+    const b = v.benchmark;
+    state.data[v.key].bench = null;
+    if (!b) return;
+    try {
+      const r = await fetch(LLAMA + b.pool);
+      if (!r.ok) return;
+      const j = await r.json();
+      state.data[v.key].bench = (j.data || [])
+        .filter(p => p.apy != null)
+        .map(p => ({ t: Math.floor(new Date(p.timestamp).getTime() / 1000), apy: p.apy }));
+    } catch (e) { /* leave bench null */ }
+  }));
+}
+
+// Average benchmark APY (percent) over the trailing `days`, or since `fromT`.
+function avgApyWindow(series, days){
+  if (!series || !series.length) return null;
+  const cut = series[series.length-1].t - days*C.DAY;
+  const w = series.filter(p => p.t >= cut);
+  return w.length ? w.reduce((s,x)=>s+x.apy,0)/w.length : null;
+}
+function avgApyFrom(series, fromT){
+  if (!series || !series.length) return null;
+  const w = series.filter(p => p.t >= fromT);
+  return w.length ? w.reduce((s,x)=>s+x.apy,0)/w.length : null;
+}
+
 // ---------- formatting ----------
 const fmtDate = t => new Date(t*1000).toISOString().slice(0,10);
 const fmtMonthYr = t => { const d=new Date(t*1000); return MONTHS[d.getUTCMonth()]+' '+d.getUTCFullYear(); };
@@ -406,27 +440,30 @@ function applyVisibility(){
 
 function renderStats(d){
   const first=d.points[0], last=d.points[d.points.length-1];
-  const since = C.cumulativeReturn(d.points);
-  const cagr = C.cagr(d.points);
-  const ty = C.trailingYield(d.points, state.yieldWin);
+  const win = state.yieldWin; // 7 | 30 | 'all'
+  // Fund yield for the selected window; 'all' = since-inception annualized (CAGR).
+  const fundY = win==='all' ? C.cagr(d.points) : C.trailingYield(d.points, win);
+  // Benchmark APY (percent) over the same window.
+  const benchApy = win==='all' ? avgApyFrom(d.bench, first.x) : avgApyWindow(d.bench, win);
+  const mult = (benchApy!=null && benchApy>0 && fundY!=null) ? (fundY*100/benchApy) : null;
+  const bm = d.meta.benchmark;
   const tvl = d.meta.tvlInNative
     ? `${fmtAmt(d.tvlNative)} <span class="u">${d.meta.asset}</span>`
     : fmtUsd(d.tvlUsd);
   const tvlSub = d.meta.tvlInNative ? fmtUsd(d.tvlUsd) : '';
-  const yseg = [7,30,90].map(w=>`<button data-v="${w}" class="${w===state.yieldWin?'active':''}">${w}D</button>`).join('');
+  const opts = [['7','7D'],['30','30D'],['all','All']];
+  const yseg = opts.map(([v,l])=>`<button data-v="${v}" class="${(''+win)===v?'active':''}">${l}</button>`).join('');
+  const ysub = win==='all' ? 'since inception · net' : `${win}-day, annualized · net`;
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="label">Share price</div>
       <div class="num">${fmtPps(d.currentPps,d.meta.decimals)} <span class="u">${d.meta.asset}</span></div>
       <div class="sub">at ${fmtDate(last.x)}</div></div>
-    <div class="stat"><div class="label">Since inception</div>
-      <div class="num ${cls(since)}">${fmtPct(since)}</div>
-      <div class="sub">since ${fmtDate(first.x)}</div></div>
-    <div class="stat"><div class="label">Annualized (CAGR)</div>
-      <div class="num accent">${fmtPctP(cagr)}</div>
-      <div class="sub">geometric, net</div></div>
-    <div class="stat"><div class="label">Trailing yield <span class="miniseg" id="yseg">${yseg}</span></div>
-      <div class="num ${cls(ty)}">${fmtPctP(ty)}</div>
-      <div class="sub">${state.yieldWin}-day, annualized · net</div></div>
+    <div class="stat"><div class="label">vs ${bm.label}</div>
+      <div class="num accent">${mult==null?'—':mult.toFixed(2)+'×'}</div>
+      <div class="sub">${benchApy==null?'benchmark unavailable':`${bm.label} ${benchApy.toFixed(2)}% · fund ${fundY==null?'—':(fundY*100).toFixed(2)+'%'}`}</div></div>
+    <div class="stat"><div class="label">Yield <span class="miniseg" id="yseg">${yseg}</span></div>
+      <div class="num ${cls(fundY)}">${fmtPctP(fundY)}</div>
+      <div class="sub">${ysub}</div></div>
     <div class="stat"><div class="label">Total assets</div>
       <div class="num">${tvl}</div>
       <div class="sub">${tvlSub}</div></div>
@@ -435,7 +472,7 @@ function renderStats(d){
       <div class="sub">${d.points.length} settlements</div></div>`;
   document.getElementById('asof').textContent = fmtDate(last.x);
   document.querySelectorAll('#yseg button').forEach(b=>{
-    b.onclick = ()=>{ state.yieldWin=Number(b.dataset.v); renderStats(d); };
+    b.onclick = ()=>{ state.yieldWin = b.dataset.v==='all'?'all':Number(b.dataset.v); renderStats(d); };
   });
 }
 
@@ -620,7 +657,7 @@ document.getElementById('rf').onchange=e=>{
 };
 
 // ---------- boot ----------
-fetchAll().then(()=>{
+fetchAll().then(fetchBenchmarks).then(()=>{
   document.getElementById('loading').style.display='none';
   document.getElementById('app').style.display='';
   renderAll();
