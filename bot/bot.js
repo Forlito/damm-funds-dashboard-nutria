@@ -24,11 +24,10 @@ const fundKeyboard = {
 function metricKeyboard(fundKey){
   const b = id => ({ text: METRICS[id].label, callback_data:`m:${fundKey}:${id}` });
   return { inline_keyboard: [
-    [b('composition')],
-    [b('current'), b('yield7'), b('yield30')],
-    [b('since'), b('nav')],
-    [b('tvl'), b('fees')],
-    [b('all')],
+    [b('yield7'), b('yield30')],
+    [b('composition'), b('decomposition')],
+    [b('price')],
+    [b('drawdown'), b('negmonths')],
     [{ text:'↩ Switch fund', callback_data:'menu' }],
   ] };
 }
@@ -42,16 +41,14 @@ const metricMenuText = key => `<b>${FUNDS[key].label}</b> — choose a metric:`;
 
 // ---------- command registration ----------
 bot.setMyCommands([
-  { command:'start',       description:'Open the menu' },
-  { command:'composition', description:'Current composition' },
-  { command:'current',     description:'Current yield' },
-  { command:'yield7',      description:'Yield — 7 days' },
-  { command:'yield30',     description:'Yield — 30 days' },
-  { command:'since',       description:'Since inception' },
-  { command:'nav',         description:'Last NAV / share' },
-  { command:'tvl',         description:'Total assets' },
-  { command:'fees',        description:'Fees' },
-  { command:'all',         description:'Everything' },
+  { command:'start',         description:'Open the menu' },
+  { command:'yield7',        description:'Yield — 7 days' },
+  { command:'yield30',       description:'Yield — 30 days' },
+  { command:'composition',   description:'Current composition (holdings)' },
+  { command:'decomposition', description:'Decomposition (by asset & protocol)' },
+  { command:'price',         description:'Last share price (NAV)' },
+  { command:'drawdown',      description:'Maximum drawdown' },
+  { command:'negmonths',     description:'% of negative months' },
 ]).catch(()=>{});
 
 // ---------- menu commands ----------
@@ -63,7 +60,7 @@ bot.onText(/^\/(start|menu|help)\b/, msg => {
 // ---------- direct metric slash commands ----------
 // Accept an optional fund arg, e.g. "/yield7 stable" or "/nav if". With no arg,
 // show the fund chooser wired to that metric.
-const CMD_RE = /^\/(composition|current|yield7|yield30|since|nav|tvl|fees|all)(?:@\w+)?(?:\s+(stable|if|damm-?if|eth))?\b/i;
+const CMD_RE = /^\/(yield7|yield30|composition|decomposition|price|drawdown|negmonths)(?:@\w+)?(?:\s+(stable|if|damm-?if|eth))?\b/i;
 bot.onText(CMD_RE, async (msg, m) => {
   if (!allowed(msg.chat.id)) return bot.sendMessage(msg.chat.id, 'Not authorized.');
   const id = m[1].toLowerCase();

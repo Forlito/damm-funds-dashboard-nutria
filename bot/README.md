@@ -12,21 +12,22 @@ fund — either tap the fund button, or pass it as an argument (`stable` | `if`)
 | Command | Returns |
 |---|---|
 | `/start` | Menu: pick a fund, then a metric (button-driven) |
-| `/composition` | Current composition (by token + by protocol) |
-| `/current` | Current yield (latest settlement, annualized) |
-| `/yield7` | Yield — trailing 7 days (annualized) |
-| `/yield30` | Yield — trailing 30 days (annualized) |
-| `/since` | Since inception — total return + CAGR |
-| `/nav` | Last NAV per share + settlement date |
-| `/tvl` | Total assets |
-| `/fees` | Management & performance fees |
-| `/all` | Everything in one message |
+| `/yield7` | Yield — trailing 7 days (annualized, net) |
+| `/yield30` | Yield — trailing 30 days (annualized, net) |
+| `/composition` | Current composition — the actual holdings (positions, %, $, APY) |
+| `/decomposition` | Breakdown by underlying asset and by protocol exposure |
+| `/price` | Last share price (NAV per share) + settlement date |
+| `/drawdown` | Maximum drawdown |
+| `/negmonths` | % of negative months |
 
-Examples: `/nav stable`, `/yield30 if`. With no argument the bot shows fund buttons.
+Examples: `/price stable`, `/yield30 if`. With no argument the bot shows fund buttons.
 
-All yields are **net of fees** and annualized. Because NAV settles ~weekly, the
-7d/30d figures are computed from the settled price-per-share series (same method
-as the dashboard).
+**Data sources.** Yields, share price, max drawdown and % negative months are
+computed from the **Lagoon** price-per-share history (same engine as the
+dashboard; net of fees, annualized — NAV settles ~weekly). **Composition and
+decomposition come from the DAMM allocator** (`dammallocator.vercel.app`), which
+is the correct, complete source — the Lagoon `composition` field only reports
+deployed positions and is incomplete.
 
 ## Try it with no token first (dry run)
 
@@ -86,11 +87,22 @@ or just run it inside `screen`/`tmux`.
 | `bot.js` | Telegram wiring (commands, inline-button menu, access control) |
 | `cli.js` | Dry-run — print metrics without a token |
 
+## Composition source (allocator)
+
+Composition/decomposition are fetched from the allocator bundle. Defaults work
+out of the box; override via env vars if needed:
+
+```bash
+ALLOCATOR_URL="https://dammallocator.vercel.app/data/funds-bundle.json"
+ALLOCATOR_USER="damm"
+ALLOCATOR_PASS="nutria"
+```
+
+If the allocator is unreachable, composition/decomposition reply "unavailable"
+while the Lagoon-based metrics (yields, price, drawdown, neg-months) keep working.
+
 ## Notes
 
-- **Composition** comes from Lagoon's `composition` field. For DAMMstable the
-  composition total can differ from total assets (Lagoon reports deployed
-  positions; idle/pending capital may not appear) — this mirrors what Lagoon's
-  own UI shows.
-- Data is cached 60s per fund to avoid hammering the API on rapid taps.
-- No secrets are stored in the repo; the token is read from the environment.
+- Lagoon data is cached 60s per fund; the allocator bundle 5 min.
+- No secrets are stored in the repo; the bot token (and allocator creds, if you
+  override the defaults) are read from the environment.
