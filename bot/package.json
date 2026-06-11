@@ -1,0 +1,13 @@
+{
+  "name": "damm-funds-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Telegram bot for DAMM funds performance (DAMMstable & DAMM-IF), live from the Lagoon API. Shares core.js with the dashboard.",
+  "scripts": {
+    "start": "node bot.js",
+    "dry": "node cli.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
